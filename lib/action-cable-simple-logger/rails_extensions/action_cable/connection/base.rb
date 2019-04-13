@@ -21,8 +21,6 @@ module ActionCable
 
       def handle_close
         ActiveSupport::Notifications.instrument('disconnect.action_cable', notification_payload('disconnect')) do
-          logger.info finished_request_message if Lograge.lograge_config.keep_original_rails_log
-
           server.remove_connection(self)
 
           subscriptions.unsubscribe_from_all
