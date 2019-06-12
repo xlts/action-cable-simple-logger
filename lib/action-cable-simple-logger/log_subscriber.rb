@@ -1,5 +1,5 @@
 module ActionCableSimpleLogger
-  class LogSubscriber
+  class LogSubscriber < ActiveSupport::LogSubscriber
     %i(perform_action subscribe unsubscribe connect disconnect).each do |method_name|
       define_method(method_name) do |event|
         process_event(event)
@@ -13,13 +13,11 @@ module ActionCableSimpleLogger
     private
 
     def process_event(event)
-      # TODO format message
-
-      message_hash = message(event)
-      logger.send(ActionCableSimpleLogger.config.log_level, formatted_message(message_hash))
+      message_hash = build_message_hash(event)
+      logger.public_send(ActionCableSimpleLogger.config.log_level, formatted_message(message_hash))
     end
 
-    def message(event)
+    def build_message_hash(event)
       payload = event.payload
 
       {
@@ -27,8 +25,7 @@ module ActionCableSimpleLogger
         controller: payload[:channel_class] || payload[:connection_class],
         action: payload[:action],
         duration: event.duration.to_f.round(2),
-        status: calculate_status(event.payload)
-      }
+      }.merge(calculate_status(event.payload))
     end
 
     def calculate_status(payload)
@@ -51,8 +48,17 @@ module ActionCableSimpleLogger
       200
     end
 
-    def extract_runtimes(event, _payload)
-      { duration: event.duration.to_f.round(2) }
+    def formatted_message(message_hash)
+      custom_format = ActionCableSimpleLogger.config.format
+      if custom_format
+        custom_format.call(message_hash)
+      else
+        default_formatted_message(message_hash)
+      end
+    end
+
+    def default_formatted_message(message_hash)
+      "[Action Cable] [#{message_hash[:status]}] (#{message_hash[:controller]}##{message_hash[:action]})"
     end
   end
 end
